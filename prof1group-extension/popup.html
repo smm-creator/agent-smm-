@@ -107,8 +107,13 @@
 
     <div id="content-plan-result" class="hidden">
       <div class="plan-actions">
-        <button id="btn-download-csv" class="btn btn-secondary">⬇ Завантажити CSV</button>
-        <button id="btn-open-sheets" class="btn btn-sheets">📊 Відкрити Google Sheets</button>
+        <button id="btn-download-csv" class="btn btn-secondary">⬇ CSV</button>
+        <button id="btn-open-sheets" class="btn btn-sheets">📊 Sheets</button>
+        <button id="btn-export-notion" class="btn btn-notion">📝 Notion</button>
+      </div>
+      <div id="notion-progress" class="notion-progress hidden">
+        <div class="notion-bar-wrap"><div id="notion-bar" class="notion-bar"></div></div>
+        <div id="notion-progress-text" class="notion-progress-text">Підготовка...</div>
       </div>
       <div id="plan-table-container"></div>
     </div>
@@ -124,6 +129,8 @@
   </section>
 
   <script src="utils/content-plan.js"></script>
+  <script src="utils/sheets.js"></script>
+  <script src="utils/notion.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

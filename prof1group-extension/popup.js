@@ -232,6 +232,7 @@
     document.getElementById('btn-generate-plan').addEventListener('click', generatePlan);
     document.getElementById('btn-download-csv').addEventListener('click', downloadCSV);
     document.getElementById('btn-open-sheets').addEventListener('click', openSheets);
+    document.getElementById('btn-export-notion').addEventListener('click', exportToNotion);
   }
 
   function generatePlan() {
@@ -280,6 +281,49 @@
       filename: `Контент-план_${currentPlan.monthName}_${currentPlan.year}.csv`,
       saveAs: true
     });
+  }
+
+  async function exportToNotion() {
+    if (!currentPlan) return;
+
+    const { token, databaseId } = await window.NotionIntegration.getSettings();
+
+    if (!token || !databaseId) {
+      chrome.runtime.openOptionsPage();
+      return;
+    }
+
+    const btn = document.getElementById('btn-export-notion');
+    const progress = document.getElementById('notion-progress');
+    const bar = document.getElementById('notion-bar');
+    const progressText = document.getElementById('notion-progress-text');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Notion...';
+    progress.classList.remove('hidden');
+    bar.style.width = '0%';
+
+    const result = await window.NotionIntegration.exportPlan(
+      currentPlan,
+      (current, total, topic) => {
+        const pct = Math.round((current / total) * 100);
+        bar.style.width = pct + '%';
+        progressText.textContent = `${current} / ${total}: ${topic.slice(0, 40)}`;
+      }
+    );
+
+    if (result.ok) {
+      bar.style.width = '100%';
+      progressText.textContent = `✅ Готово! ${result.success} постів додано до Notion`;
+      btn.textContent = '📝 Відкрити Notion';
+      btn.disabled = false;
+      btn.onclick = () => chrome.tabs.create({ url: result.dbUrl });
+    } else {
+      progressText.textContent = `❌ ${result.error}`;
+      btn.textContent = '📝 Notion';
+      btn.disabled = false;
+      btn.onclick = exportToNotion;
+    }
   }
 
   async function openSheets() {

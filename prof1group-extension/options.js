@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadSettings() {
   const data = await chrome.storage.local.get([
-    'checkInterval', 'notifyMode', 'appsScriptUrl'
+    'checkInterval', 'notifyMode', 'appsScriptUrl', 'notionToken', 'notionDatabaseId'
   ]);
 
   if (data.checkInterval) {
@@ -20,12 +20,21 @@ async function loadSettings() {
     document.getElementById('apps-script-url').value = data.appsScriptUrl;
     updateScriptStatus(true);
   }
+  if (data.notionToken) {
+    document.getElementById('notion-token').value = data.notionToken;
+    updateNotionStatus(true);
+  }
+  if (data.notionDatabaseId) {
+    document.getElementById('notion-database-id').value = data.notionDatabaseId;
+  }
 }
 
 function bindEvents() {
   document.getElementById('btn-save-monitoring').addEventListener('click', saveMonitoring);
   document.getElementById('btn-save-sheets').addEventListener('click', saveSheetsUrl);
   document.getElementById('btn-test-sheets').addEventListener('click', testSheets);
+  document.getElementById('btn-save-notion').addEventListener('click', saveNotionSettings);
+  document.getElementById('btn-test-notion').addEventListener('click', testNotion);
   document.getElementById('btn-clear-data').addEventListener('click', clearData);
 }
 
@@ -85,6 +94,71 @@ async function testSheets() {
     }
   } catch (err) {
     showStatus('save-sheets-status', `❌ ${err.message}`, 'error');
+  }
+}
+
+async function saveNotionSettings() {
+  const token = document.getElementById('notion-token').value.trim();
+  const dbId  = document.getElementById('notion-database-id').value.trim().replace(/-/g, '');
+
+  if (!token || !dbId) {
+    showStatus('save-notion-status', '❌ Заповніть обидва поля', 'error');
+    return;
+  }
+
+  if (!token.startsWith('secret_') && !token.startsWith('ntn_')) {
+    showStatus('save-notion-status', '❌ Невірний формат токена', 'error');
+    return;
+  }
+
+  if (dbId.length < 20) {
+    showStatus('save-notion-status', '❌ Невірний Database ID', 'error');
+    return;
+  }
+
+  await chrome.storage.local.set({ notionToken: token, notionDatabaseId: dbId });
+  updateNotionStatus(true);
+  showStatus('save-notion-status', '✅ Збережено', 'ok');
+}
+
+async function testNotion() {
+  const token = document.getElementById('notion-token').value.trim();
+  const dbId  = document.getElementById('notion-database-id').value.trim().replace(/-/g, '');
+
+  if (!token || !dbId) {
+    showStatus('save-notion-status', '❌ Спочатку заповніть поля', 'error');
+    return;
+  }
+
+  showStatus('save-notion-status', '⏳ Перевіряю...', 'ok');
+
+  try {
+    const resp = await fetch(`https://api.notion.com/v1/databases/${dbId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Notion-Version': '2022-06-28'
+      }
+    });
+
+    if (resp.ok) {
+      const db = await resp.json();
+      const title = db.title?.[0]?.plain_text || 'База даних';
+      showStatus('save-notion-status', `✅ Підключено: "${title}"`, 'ok');
+      updateNotionStatus(true);
+    } else {
+      const err = await resp.json();
+      showStatus('save-notion-status', `❌ ${err.message || 'Помилка доступу'}`, 'error');
+    }
+  } catch (e) {
+    showStatus('save-notion-status', `❌ ${e.message}`, 'error');
+  }
+}
+
+function updateNotionStatus(connected) {
+  const tokenInput = document.getElementById('notion-token');
+  if (tokenInput) {
+    tokenInput.style.borderColor = connected ? '#057a55' : '';
   }
 }
 
