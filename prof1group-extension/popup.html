@@ -42,25 +42,38 @@
 
   <!-- Tab: Кошик -->
   <section id="tab-cart" class="tab-content">
-    <div class="section-header">
-      <span>Автозаповнення кошика</span>
+
+    <!-- Search bar -->
+    <div class="cart-search-bar">
+      <input id="cart-search-input" type="text"
+        placeholder="cursor longsleeve, 5.11 jacket, lowa boots..." />
+      <button id="btn-cart-search" class="btn btn-primary">🔍</button>
     </div>
-    <p class="help-text">
-      Введіть список товарів, кожен з нового рядка.<br />
-      Формат: <code>Назва товару | розмір</code>
-    </p>
-    <textarea
-      id="cart-input"
-      class="cart-textarea"
-      placeholder="Берці LOWA Z-6S | 43&#10;Куртка 5.11 Tactical | XL&#10;Рукавички P1G | M"
-      rows="8"
-    ></textarea>
-    <div class="cart-controls">
-      <button id="btn-cart-start" class="btn btn-primary">▶ Запустити</button>
-      <button id="btn-cart-stop" class="btn btn-danger" disabled>■ Зупинити</button>
+
+    <!-- Search state -->
+    <div id="cart-search-state" class="search-state hidden"></div>
+
+    <!-- Search results -->
+    <div id="cart-search-results" class="search-results hidden"></div>
+
+    <!-- Cart queue -->
+    <div id="cart-queue-section" class="cart-queue-section hidden">
+      <div class="queue-header">
+        <span>📋 Список для кошика</span>
+        <span id="queue-count" class="queue-count">0</span>
+        <button id="btn-queue-clear" class="btn-tiny">✕ Очистити</button>
+      </div>
+      <div id="cart-queue-list" class="queue-list"></div>
+      <div class="queue-actions">
+        <button id="btn-run-cart" class="btn btn-primary btn-full">▶ Додати все в кошик</button>
+        <button id="btn-cart-stop" class="btn btn-danger btn-full hidden">■ Зупинити</button>
+      </div>
     </div>
+
+    <!-- Status + log -->
     <div id="cart-status" class="status-box hidden"></div>
     <div id="cart-log" class="log-box"></div>
+
   </section>
 
   <!-- Tab: Контент-план -->

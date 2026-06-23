@@ -117,83 +117,402 @@
 
   // ─── Cart Tab ──────────────────────────────────────────────────────────────
 
-  function setupCartTab() {
-    const btnStart = document.getElementById('btn-cart-start');
-    const btnStop = document.getElementById('btn-cart-stop');
-    const textarea = document.getElementById('cart-input');
+  // ─── Cart Tab (new: search → results with dropdowns → queue → run) ────────
 
-    btnStart.addEventListener('click', () => startCart());
-    btnStop.addEventListener('click', () => stopCart());
+  let cartQueue = [];         // [ { title, url, size, color, image, price } ]
+  let profTab   = null;       // reused background tab
+
+  function setupCartTab() {
+    const input   = document.getElementById('cart-search-input');
+    const btnSearch = document.getElementById('btn-cart-search');
+    const btnRun  = document.getElementById('btn-run-cart');
+    const btnStop = document.getElementById('btn-cart-stop');
+    const btnClear = document.getElementById('btn-queue-clear');
+
+    btnSearch.addEventListener('click', doSearch);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+    btnRun.addEventListener('click', runCart);
+    btnStop.addEventListener('click', stopCart);
+    btnClear.addEventListener('click', clearQueue);
   }
 
-  async function startCart() {
-    const textarea = document.getElementById('cart-input');
-    const raw = textarea.value.trim();
-    if (!raw) {
-      showCartStatus('Введіть список товарів', 'error');
+  // ── Search ────────────────────────────────────────────────────────────────
+
+  async function doSearch() {
+    const query = document.getElementById('cart-search-input').value.trim();
+    if (!query) return;
+
+    setSearchState(`🔍 Шукаю «${query}»<span class="dots"></span>`);
+    showSection('cart-search-results', false);
+
+    const searchUrl = `https://prof1group.ua/search/?q=${encodeURIComponent(query)}`;
+
+    try {
+      const tab = await getOrCreateProfTab(searchUrl);
+      await waitForTab(tab.id, 4000);
+      await sleep(2000);
+
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          // Inline search scan (must be self-contained)
+          const results = [];
+          const seen = new Set();
+          const containerSelectors = [
+            '.catalog-item','.product-item','[class*="product-card"]',
+            '[class*="catalog-item"]','article','[class*="goods-item"]',
+            '.search__item','.search-result','.item'
+          ];
+          let containers = [];
+          for (const sel of containerSelectors) {
+            const els = [...document.querySelectorAll(sel)];
+            if (els.length >= 1) { containers = els; break; }
+          }
+          // Fallback: find cards near product images
+          if (containers.length === 0) {
+            document.querySelectorAll('img').forEach(img => {
+              const card = img.closest('li, article, div[class*="item"], div[class*="product"]');
+              if (card && !seen.has(card)) { seen.add(card); containers.push(card); }
+            });
+          }
+          function findIn(el, sels) {
+            for (const s of sels) { const f = el.querySelector(s); if (f) return f; }
+            return null;
+          }
+          containers.slice(0, 15).forEach(el => {
+            const titleEl = findIn(el, ['h2','h3','h4','[class*="name"]','[class*="title"]','a']);
+            const priceEl = findIn(el, ['[class*="price"]','.price']);
+            const linkEl  = el.querySelector('a[href*="/catalog/"]') || el.querySelector('a');
+            const imgEl   = el.querySelector('img');
+            if (!titleEl) return;
+            const title = titleEl.textContent.trim();
+            if (!title || title.length < 3 || seen.has(title)) return;
+            seen.add(title);
+            results.push({
+              title,
+              price: priceEl ? priceEl.textContent.replace(/\s+/g,' ').trim() : '',
+              url: linkEl?.href || '',
+              image: imgEl?.src || imgEl?.dataset?.src || ''
+            });
+          });
+          return results;
+        }
+      });
+
+      const products = res?.result || [];
+
+      if (products.length === 0) {
+        setSearchState('😕 Нічого не знайдено. Спробуй іншу назву.');
+      } else {
+        setSearchState('');
+        renderSearchResults(products, tab.id);
+      }
+    } catch (err) {
+      setSearchState(`❌ Помилка: ${err.message}`);
+    }
+  }
+
+  function renderSearchResults(products, tabId) {
+    const container = document.getElementById('cart-search-results');
+    container.innerHTML = '';
+    container.classList.remove('hidden');
+
+    products.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'result-card';
+
+      const imgHtml = p.image
+        ? `<img class="result-img" src="${escapeAttr(p.image)}" alt="" onerror="this.style.display='none'">`
+        : `<div class="result-img-placeholder">🎽</div>`;
+
+      card.innerHTML = `
+        ${imgHtml}
+        <div class="result-body">
+          <div class="result-title" title="${escapeAttr(p.title)}">${escapeHtml(p.title)}</div>
+          ${p.price ? `<div class="result-price">${escapeHtml(p.price)}</div>` : ''}
+          <div class="result-selectors">
+            <select class="select-size loading" data-url="${escapeAttr(p.url)}">
+              <option value="">⏳ Розміри…</option>
+            </select>
+            <select class="select-color loading" data-url="${escapeAttr(p.url)}">
+              <option value="">⏳ Кольори…</option>
+            </select>
+            <button class="btn-add-queue" disabled>+ В список</button>
+          </div>
+        </div>
+      `;
+
+      container.appendChild(card);
+
+      // Load sizes/colors lazily
+      loadProductOptions(card, p, tabId);
+    });
+  }
+
+  async function loadProductOptions(card, product, tabId) {
+    if (!product.url) {
+      fillSelectFallback(card);
       return;
     }
 
-    const items = parseCartList(raw);
-    if (items.length === 0) {
-      showCartStatus('Список порожній або невірний формат', 'error');
+    try {
+      await navigateTab(tabId, product.url);
+      await waitForTab(tabId, 5000);
+      await sleep(1800);
+
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          function getLabel(el) {
+            return el.id ? (document.querySelector(`label[for="${el.id}"]`)?.textContent || '') : '';
+          }
+          const sizes = []; const colors = []; const seenS = new Set(); const seenC = new Set();
+
+          // Sizes from <select>
+          document.querySelectorAll('select').forEach(sel => {
+            if (!/size|розмір|розм|размер/i.test(sel.name + sel.id + sel.className + getLabel(sel))) return;
+            [...sel.options].forEach(opt => {
+              const v = opt.textContent.trim();
+              if (v && v.length < 25 && !/вибер|select|обрати/i.test(v) && !seenS.has(v)) {
+                sizes.push(v); seenS.add(v);
+              }
+            });
+          });
+
+          // Sizes from buttons
+          if (!sizes.length) {
+            for (const sel of ['[class*="size"]','[class*="rozm"]','[class*="attr"]']) {
+              document.querySelectorAll(sel).forEach(cont => {
+                cont.querySelectorAll('button,span,li,label').forEach(btn => {
+                  const v = btn.textContent.trim();
+                  if (v && v.length < 15 && /^\d|^(XS|S|M|L|XL|XXL|XXXL|one)/i.test(v) && !seenS.has(v)) {
+                    sizes.push(v); seenS.add(v);
+                  }
+                });
+              });
+              if (sizes.length) break;
+            }
+          }
+
+          // Colors from <select>
+          document.querySelectorAll('select').forEach(sel => {
+            if (!/color|colour|колір|цвет/i.test(sel.name + sel.id + sel.className + getLabel(sel))) return;
+            [...sel.options].forEach(opt => {
+              const v = opt.textContent.trim();
+              if (v && v.length < 40 && !/вибер|select|обрати/i.test(v) && !seenC.has(v)) {
+                colors.push(v); seenC.add(v);
+              }
+            });
+          });
+
+          // Colors from swatches
+          if (!colors.length) {
+            for (const sel of ['[class*="color"]','[class*="colour"]','[class*="swatch"]']) {
+              document.querySelectorAll(sel).forEach(cont => {
+                cont.querySelectorAll('span,li,button,label').forEach(item => {
+                  const v = (item.title || item.getAttribute('data-name') || item.textContent).trim();
+                  if (v && v.length < 50 && !seenC.has(v)) { colors.push(v); seenC.add(v); }
+                });
+              });
+              if (colors.length) break;
+            }
+          }
+
+          const priceEl = document.querySelector('[class*="price__current"],[class*="current-price"],[class*="price"]');
+          return { sizes, colors, price: priceEl?.textContent.replace(/\s+/g,' ').trim() || '' };
+        }
+      });
+
+      const opts = res?.result || { sizes: [], colors: [] };
+      fillSelects(card, product, opts);
+    } catch (err) {
+      fillSelectFallback(card);
+    }
+  }
+
+  function fillSelects(card, product, opts) {
+    const sizeEl  = card.querySelector('.select-size');
+    const colorEl = card.querySelector('.select-color');
+    const addBtn  = card.querySelector('.btn-add-queue');
+
+    sizeEl.classList.remove('loading');
+    colorEl.classList.remove('loading');
+
+    if (opts.sizes.length > 0) {
+      sizeEl.innerHTML = `<option value="">— Розмір —</option>` +
+        opts.sizes.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+    } else {
+      sizeEl.innerHTML = '<option value="">Без розміру</option>';
+    }
+
+    if (opts.colors.length > 0) {
+      colorEl.innerHTML = `<option value="">— Колір —</option>` +
+        opts.colors.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
+    } else {
+      colorEl.innerHTML = '<option value="">Без кольору</option>';
+    }
+
+    if (opts.price) {
+      const priceEl = card.querySelector('.result-price');
+      if (priceEl) priceEl.textContent = opts.price;
+    }
+
+    addBtn.disabled = false;
+    addBtn.addEventListener('click', () => {
+      const size  = sizeEl.value;
+      const color = colorEl.value;
+      addToQueue({ title: product.title, url: product.url, image: product.image, price: opts.price || product.price, size, color });
+      addBtn.textContent = '✅';
+      addBtn.disabled = true;
+      setTimeout(() => { addBtn.textContent = '+ В список'; addBtn.disabled = false; }, 2000);
+    });
+  }
+
+  function fillSelectFallback(card) {
+    const sizeEl  = card.querySelector('.select-size');
+    const colorEl = card.querySelector('.select-color');
+    const addBtn  = card.querySelector('.btn-add-queue');
+    sizeEl.innerHTML  = '<option value="">Введи вручну</option>';
+    colorEl.innerHTML = '<option value="">Введи вручну</option>';
+    sizeEl.classList.remove('loading');
+    colorEl.classList.remove('loading');
+    addBtn.disabled = false;
+    addBtn.addEventListener('click', () => {
+      const product = { title: sizeEl.dataset.url || 'Товар', url: sizeEl.dataset.url || '', image: '', price: '' };
+      addToQueue({ ...product, size: sizeEl.value, color: colorEl.value });
+    });
+  }
+
+  // ── Cart Queue ────────────────────────────────────────────────────────────
+
+  function addToQueue(item) {
+    cartQueue.push(item);
+    renderQueue();
+  }
+
+  function clearQueue() {
+    cartQueue = [];
+    renderQueue();
+  }
+
+  function renderQueue() {
+    const section = document.getElementById('cart-queue-section');
+    const list    = document.getElementById('cart-queue-list');
+    const count   = document.getElementById('queue-count');
+
+    count.textContent = cartQueue.length;
+
+    if (cartQueue.length === 0) {
+      section.classList.add('hidden');
+      list.innerHTML = '';
       return;
     }
+
+    section.classList.remove('hidden');
+
+    list.innerHTML = cartQueue.map((item, idx) => `
+      <div class="queue-item">
+        <span class="queue-item-name" title="${escapeAttr(item.title)}">${escapeHtml(item.title)}</span>
+        <div class="queue-item-tags">
+          ${item.size  ? `<span class="queue-tag">📐 ${escapeHtml(item.size)}</span>` : ''}
+          ${item.color ? `<span class="queue-tag">🎨 ${escapeHtml(item.color)}</span>` : ''}
+        </div>
+        <button class="queue-item-del" data-idx="${idx}" title="Видалити">✕</button>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.queue-item-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        cartQueue.splice(parseInt(btn.dataset.idx), 1);
+        renderQueue();
+      });
+    });
+  }
+
+  // ── Run Cart ──────────────────────────────────────────────────────────────
+
+  async function runCart() {
+    if (cartQueue.length === 0) return;
+
+    const btnRun  = document.getElementById('btn-run-cart');
+    const btnStop = document.getElementById('btn-cart-stop');
+    btnRun.classList.add('hidden');
+    btnStop.classList.remove('hidden');
 
     clearLog();
-    addLog(`Починаю обробку ${items.length} товарів...`, 'info');
-    showCartStatus(`Запущено: 0 / ${items.length}`, 'running');
+    addLog(`▶ Починаю: ${cartQueue.length} товарів`, 'info');
+    showCartStatus(`Запущено 0 / ${cartQueue.length}`, 'running');
 
-    document.getElementById('btn-cart-start').disabled = true;
-    document.getElementById('btn-cart-stop').disabled = false;
+    const tab = await getOrCreateProfTab('https://prof1group.ua/catalog/');
 
-    // Find active prof1group tab or open new one
-    const tabs = await chrome.tabs.query({ url: 'https://prof1group.ua/*' });
-    let tab;
+    try {
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => !!window.prof1AgentReady
+      });
+      // If content script not ready (just opened), wait
+      if (!res?.result) await waitForTab(tab.id, 3000);
+    } catch (_) {}
 
-    if (tabs.length > 0) {
-      tab = tabs[0];
-    } else {
-      tab = await chrome.tabs.create({ url: 'https://prof1group.ua/catalog/' });
-      await waitForTab(tab.id);
-    }
-
-    chrome.tabs.sendMessage(tab.id, { type: 'START_CART', items });
+    chrome.tabs.sendMessage(tab.id, { type: 'RUN_CART', items: cartQueue });
   }
 
   async function stopCart() {
     const tabs = await chrome.tabs.query({ url: 'https://prof1group.ua/*' });
-    tabs.forEach(tab => chrome.tabs.sendMessage(tab.id, { type: 'STOP_CART' }));
-    addLog('Зупинено.', 'warn');
+    tabs.forEach(t => chrome.tabs.sendMessage(t.id, { type: 'STOP_CART' }).catch(() => {}));
+    addLog('■ Зупинено', 'warn');
     showCartStatus('Зупинено', 'error');
-    document.getElementById('btn-cart-start').disabled = false;
-    document.getElementById('btn-cart-stop').disabled = true;
+    document.getElementById('btn-run-cart').classList.remove('hidden');
+    document.getElementById('btn-cart-stop').classList.add('hidden');
   }
 
-  function parseCartList(raw) {
-    return raw.split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map(line => {
-        const parts = line.split('|');
-        return {
-          name: parts[0].trim(),
-          size: parts[1] ? parts[1].trim() : '',
-          url: ''
-        };
-      });
+  // ── Tab helpers ───────────────────────────────────────────────────────────
+
+  async function getOrCreateProfTab(url) {
+    // Reuse existing prof1group tab if available
+    const tabs = await chrome.tabs.query({ url: 'https://prof1group.ua/*' });
+    if (tabs.length > 0) {
+      if (url) await chrome.tabs.update(tabs[0].id, { url });
+      return tabs[0];
+    }
+    const tab = await chrome.tabs.create({ url: url || 'https://prof1group.ua/', active: false });
+    profTab = tab;
+    return tab;
   }
 
-  function waitForTab(tabId) {
+  async function navigateTab(tabId, url) {
+    await chrome.tabs.update(tabId, { url });
+    await sleep(300);
+  }
+
+  function waitForTab(tabId, extraWait = 0) {
     return new Promise(resolve => {
       const listener = (id, info) => {
         if (id === tabId && info.status === 'complete') {
           chrome.tabs.onUpdated.removeListener(listener);
-          setTimeout(resolve, 1500);
+          setTimeout(resolve, extraWait || 500);
         }
       };
       chrome.tabs.onUpdated.addListener(listener);
+      // Safety timeout
+      setTimeout(resolve, 12000);
     });
+  }
+
+  // ── UI Helpers ────────────────────────────────────────────────────────────
+
+  function setSearchState(html) {
+    const el = document.getElementById('cart-search-state');
+    if (html) {
+      el.innerHTML = html;
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+
+  function showSection(id, show) {
+    document.getElementById(id).classList.toggle('hidden', !show);
   }
 
   // ─── Cart Status / Log ─────────────────────────────────────────────────────
@@ -362,24 +681,26 @@
 
   function listenForMessages() {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg.type === 'CART_PROGRESS') {
+      if (msg.type === 'CART_PROGRESS' || msg.type === 'CART_STATUS') {
         const d = msg.data;
+        const name = d.item?.title || d.item?.name || '';
         if (d.status === 'processing') {
-          addLog(`Обробляю: ${d.item.name}${d.item.size ? ' (розмір: ' + d.item.size + ')' : ''}...`, 'info');
+          const tags = [d.item?.size, d.item?.color].filter(Boolean).join(', ');
+          addLog(`⏳ ${name}${tags ? ' [' + tags + ']' : ''}`, 'info');
           showCartStatus(`Обробляю: ${d.index + 1} / ${d.total}`, 'running');
         } else if (d.status === 'added') {
-          addLog(`✅ Додано: ${d.item.name}`, 'ok');
+          addLog(`✅ Додано: ${name}`, 'ok');
         } else if (d.status === 'error') {
-          addLog(`❌ Помилка (${d.item.name}): ${d.error}`, 'error');
+          addLog(`❌ ${name}: ${d.error}`, 'error');
         } else if (d.status === 'navigating') {
-          addLog(`🔗 Переходжу на сторінку товару...`, 'info');
+          addLog(`🔗 Відкриваю сторінку товару…`, 'info');
         } else if (d.status === 'size_not_found') {
-          addLog(`⚠️ Розмір "${d.item.size}" не знайдено для "${d.item.name}"`, 'warn');
+          addLog(`⚠️ Розмір «${d.item?.size}» не знайдено`, 'warn');
         } else if (d.status === 'done') {
-          addLog('✅ Готово! Перевірте кошик.', 'ok');
-          showCartStatus('Завершено!', 'ok');
-          document.getElementById('btn-cart-start').disabled = false;
-          document.getElementById('btn-cart-stop').disabled = true;
+          addLog('✅ Готово! Перевірте кошик на сайті.', 'ok');
+          showCartStatus('Готово!', 'ok');
+          document.getElementById('btn-run-cart').classList.remove('hidden');
+          document.getElementById('btn-cart-stop').classList.add('hidden');
         }
       }
     });
@@ -397,6 +718,10 @@
 
   function escapeAttr(str) {
     return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
   }
 
 })();
