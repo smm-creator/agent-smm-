@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PROF1Group Агент</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="logo">
+      <img src="icons/icon48.png" alt="Logo" width="24" height="24" />
+      <span>PROF1Group Агент</span>
+    </div>
+    <div class="header-actions">
+      <button id="btn-refresh" class="icon-btn" title="Перевірити зараз">↺</button>
+      <button id="btn-options" class="icon-btn" title="Налаштування">⚙</button>
+    </div>
+  </header>
+
+  <!-- Last check time -->
+  <div class="last-check" id="last-check">Перевірка не виконувалась</div>
+
+  <!-- Tabs -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="tab-new">🆕 Новинки</button>
+    <button class="tab" data-tab="tab-cart">🛒 Кошик</button>
+    <button class="tab" data-tab="tab-content">📅 Контент</button>
+  </nav>
+
+  <!-- Tab: Новинки -->
+  <section id="tab-new" class="tab-content active">
+    <div class="section-header">
+      <span>Нові надходження</span>
+      <a href="https://prof1group.ua/catalog/" target="_blank" class="link-btn">Відкрити каталог →</a>
+    </div>
+    <div id="new-products-list" class="product-list">
+      <div class="empty-state">Натисніть ↺ щоб перевірити новинки</div>
+    </div>
+  </section>
+
+  <!-- Tab: Кошик -->
+  <section id="tab-cart" class="tab-content">
+    <div class="section-header">
+      <span>Автозаповнення кошика</span>
+    </div>
+    <p class="help-text">
+      Введіть список товарів, кожен з нового рядка.<br />
+      Формат: <code>Назва товару | розмір</code>
+    </p>
+    <textarea
+      id="cart-input"
+      class="cart-textarea"
+      placeholder="Берці LOWA Z-6S | 43&#10;Куртка 5.11 Tactical | XL&#10;Рукавички P1G | M"
+      rows="8"
+    ></textarea>
+    <div class="cart-controls">
+      <button id="btn-cart-start" class="btn btn-primary">▶ Запустити</button>
+      <button id="btn-cart-stop" class="btn btn-danger" disabled>■ Зупинити</button>
+    </div>
+    <div id="cart-status" class="status-box hidden"></div>
+    <div id="cart-log" class="log-box"></div>
+  </section>
+
+  <!-- Tab: Контент-план -->
+  <section id="tab-content" class="tab-content">
+    <div class="section-header">
+      <span>Контент-план</span>
+    </div>
+
+    <div class="content-form">
+      <div class="form-row">
+        <label>Місяць</label>
+        <select id="content-month">
+          <option value="1">Січень</option>
+          <option value="2">Лютий</option>
+          <option value="3">Березень</option>
+          <option value="4">Квітень</option>
+          <option value="5">Травень</option>
+          <option value="6" selected>Червень</option>
+          <option value="7">Липень</option>
+          <option value="8">Серпень</option>
+          <option value="9">Вересень</option>
+          <option value="10">Жовтень</option>
+          <option value="11">Листопад</option>
+          <option value="12">Грудень</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Рік</label>
+        <input type="number" id="content-year" value="2026" min="2024" max="2030" />
+      </div>
+      <div class="form-row">
+        <label>Фокус</label>
+        <select id="content-focus">
+          <option value="mixed">Змішаний (рекомендовано)</option>
+          <option value="clothing">Одяг та форма</option>
+          <option value="footwear">Взуття</option>
+          <option value="equipment">Тактичне спорядження</option>
+          <option value="protection">Засоби захисту</option>
+          <option value="camp">Бівачне спорядження</option>
+        </select>
+      </div>
+      <button id="btn-generate-plan" class="btn btn-primary btn-full">⚡ Згенерувати план</button>
+    </div>
+
+    <div id="content-plan-result" class="hidden">
+      <div class="plan-actions">
+        <button id="btn-download-csv" class="btn btn-secondary">⬇ Завантажити CSV</button>
+        <button id="btn-open-sheets" class="btn btn-sheets">📊 Відкрити Google Sheets</button>
+      </div>
+      <div id="plan-table-container"></div>
+    </div>
+
+    <!-- Google Sheets URL setup (shown when no URL configured) -->
+    <div id="sheets-setup" class="sheets-setup hidden">
+      <div class="setup-info">
+        <strong>Підключення Google Sheets</strong>
+        <p>Введіть URL вашого Apps Script для автоматичного запису плану.</p>
+        <a href="options.html" target="_blank" class="link-btn">Налаштувати →</a>
+      </div>
+    </div>
+  </section>
+
+  <script src="utils/content-plan.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

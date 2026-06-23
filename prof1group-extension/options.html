@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>PROF1Group Агент — Налаштування</title>
+  <style>
+    :root {
+      --primary: #1a56db;
+      --border: #e5e7eb;
+      --bg: #f9fafb;
+      --card: #fff;
+      --text: #111827;
+      --muted: #6b7280;
+      --success: #057a55;
+      --danger: #e02424;
+      --sheets: #0f9d58;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 32px; max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
+    h1 img { width: 28px; height: 28px; }
+    h2 { font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 24px 0 12px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 5px; }
+    input[type="text"], input[type="number"], select {
+      width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px;
+      font-size: 13px; background: var(--card); outline: none;
+    }
+    input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,86,219,.15); }
+    .help { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+    .help a { color: var(--primary); }
+    .btn {
+      padding: 8px 18px; border: none; border-radius: 7px; cursor: pointer;
+      font-size: 13px; font-weight: 600; transition: opacity .15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { opacity: .85; }
+    .btn-sheets { background: var(--sheets); color: #fff; }
+    .btn-sheets:hover { opacity: .85; }
+    .btn-secondary { background: #e5e7eb; color: var(--text); }
+    .save-status { display: inline-block; margin-left: 12px; font-size: 13px; }
+    .save-status.ok { color: var(--success); }
+    .save-status.error { color: var(--danger); }
+
+    /* Script setup guide */
+    .setup-steps { counter-reset: steps; }
+    .step {
+      counter-increment: steps;
+      display: flex; gap: 12px; margin-bottom: 12px;
+      font-size: 13px; line-height: 1.6;
+    }
+    .step::before {
+      content: counter(steps);
+      min-width: 24px; height: 24px;
+      background: var(--primary); color: #fff;
+      border-radius: 50%; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    code {
+      background: #f3f4f6; padding: 2px 6px; border-radius: 4px;
+      font-family: monospace; font-size: 12px;
+    }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    .badge-ok { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge-warn { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <h1>
+    <img src="icons/icon48.png" alt="" />
+    PROF1Group Агент — Налаштування
+  </h1>
+
+  <!-- Monitoring settings -->
+  <h2>🔔 Моніторинг новинок</h2>
+  <div class="card">
+    <div class="field">
+      <label>Частота перевірки</label>
+      <select id="check-interval">
+        <option value="15">Кожні 15 хвилин</option>
+        <option value="30" selected>Кожні 30 хвилин</option>
+        <option value="60">Щогодини</option>
+        <option value="120">Кожні 2 години</option>
+        <option value="360">Кожні 6 годин</option>
+      </select>
+      <p class="help">Агент перевірятиме prof1group.ua на нові товари з такою частотою.</p>
+    </div>
+    <div class="field">
+      <label>Сповіщення</label>
+      <select id="notify-mode">
+        <option value="all">Показувати всі нові товари</option>
+        <option value="new_only">Тільки товари з міткою «Новинка»</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="btn-save-monitoring">Зберегти</button>
+    <span class="save-status" id="save-monitoring-status"></span>
+  </div>
+
+  <!-- Google Sheets -->
+  <h2>📊 Google Sheets інтеграція</h2>
+  <div class="card">
+    <div class="field">
+      <label>URL Google Apps Script</label>
+      <input type="text" id="apps-script-url" placeholder="https://script.google.com/macros/s/.../exec" />
+      <p class="help">Після налаштування Apps Script, вставте сюди URL. <span id="script-status"></span></p>
+    </div>
+    <button class="btn btn-primary" id="btn-save-sheets">Зберегти URL</button>
+    <button class="btn btn-sheets" id="btn-test-sheets" style="margin-left:8px">Перевірити</button>
+    <span class="save-status" id="save-sheets-status"></span>
+
+    <hr class="divider" />
+
+    <details>
+      <summary style="cursor:pointer; font-size:13px; font-weight:600; margin-bottom:12px">
+        📋 Як підключити Google Sheets (покрокова інструкція)
+      </summary>
+      <div class="setup-steps" style="margin-top:12px">
+        <div class="step">
+          Відкрий <a href="https://script.google.com" target="_blank">script.google.com</a> і натисни <strong>"Новий проєкт"</strong>
+        </div>
+        <div class="step">
+          Видали весь код і встав вміст файлу <code>appscript.gs</code> з папки розширення
+        </div>
+        <div class="step">
+          Натисни <strong>"Розгорнути" → "Новий деплой"</strong>. Тип: <code>Веб-додаток</code>. Виконувати як: <code>Я</code>. Доступ: <code>Усі</code>
+        </div>
+        <div class="step">
+          Авторизуй доступ (Google запитає дозвіл). Скопіюй URL деплою
+        </div>
+        <div class="step">
+          Встав скопійований URL у поле вище і натисни <strong>"Зберегти URL"</strong>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Danger zone -->
+  <h2>⚠️ Очистити дані</h2>
+  <div class="card">
+    <p class="help" style="margin-bottom:12px">Очистити список збережених товарів та кеш. Це не вплине на налаштування.</p>
+    <button class="btn btn-secondary" id="btn-clear-data">Очистити кеш товарів</button>
+    <span class="save-status" id="clear-status"></span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
