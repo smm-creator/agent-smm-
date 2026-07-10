@@ -1,0 +1,13 @@
+{
+  "name": "smm-agent",
+  "version": "1.0.0",
+  "description": "AI-powered SMM content strategy tool",
+  "scripts": {
+    "dev": "cd smm-agent && npm run dev",
+    "build": "cd smm-agent && npm run build",
+    "preview": "cd smm-agent && npm run preview",
+    "server": "cd server && npm start",
+    "server:dev": "cd server && npm run dev"
+  },
+  "workspaces": ["smm-agent", "server"]
+}

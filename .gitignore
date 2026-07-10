@@ -1,0 +1,8 @@
+node_modules/
+smm-agent/node_modules/
+server/node_modules/
+dist/
+smm-agent/dist/
+.env
+*.local
+.DS_Store
