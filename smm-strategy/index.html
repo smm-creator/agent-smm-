@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SMM Стратег — PROF1Group</title>
+  <meta name="description" content="Агент СММ: стратегія, пропорції контенту, формати (карусель, Stories, Reels) і щоденний мікс постів." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="brand">SMM Стратег<span>PROF1Group</span></div>
+      <p class="hero-lead">
+        Придумує СММ-стратегію, розкладає пропорції типів контенту
+        і форматів (карусель, фото, Stories, Reels) — наприклад 4 пости на день:
+        фото, історія, продаж, гумор.
+      </p>
+      <div class="hero-meta">
+        <span><strong>Роль</strong> СММ-стратег</span>
+        <span><strong>Вихід</strong> мікс + розклад</span>
+        <span><strong>Експорт</strong> CSV / TSV</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <aside class="panel panel-form">
+        <h2>Бриф</h2>
+
+        <div class="form-group">
+          <label for="platform">Платформа</label>
+          <select id="platform">
+            <option value="instagram" selected>Instagram</option>
+            <option value="facebook">Facebook</option>
+            <option value="tiktok">TikTok</option>
+            <option value="telegram">Telegram</option>
+            <option value="multi">Мультиканал</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="goal">Ціль стратегії</label>
+          <select id="goal">
+            <option value="balanced" selected>Збалансований</option>
+            <option value="sales">Продажі</option>
+            <option value="engagement">Залучення</option>
+            <option value="authority">Експертність</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="focus">Фокус товарів</label>
+          <select id="focus">
+            <option value="mixed" selected>Змішаний</option>
+            <option value="clothing">Одяг та форма</option>
+            <option value="footwear">Взуття</option>
+            <option value="equipment">Тактичне спорядження</option>
+            <option value="protection">Засоби захисту</option>
+            <option value="camp">Бівачне спорядження</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="postsPerDay">Постів на день</label>
+          <select id="postsPerDay">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+        </div>
+
+        <p class="hint">Щоденний мікс — тип контенту + формат для кожного слота:</p>
+        <div id="slots-editor" class="slots-editor" aria-label="Щоденні слоти"></div>
+
+        <div class="form-group">
+          <label for="month">Місяць плану</label>
+          <select id="month"></select>
+        </div>
+
+        <div class="form-group">
+          <label for="year">Рік</label>
+          <input id="year" type="number" min="2024" max="2035" value="2026" />
+        </div>
+
+        <button id="btn-generate" class="btn btn-primary" type="button">Згенерувати стратегію</button>
+        <div class="actions-row">
+          <button id="btn-csv" class="btn btn-ghost" type="button" disabled>⬇ CSV план</button>
+          <button id="btn-reset-slots" class="btn btn-ghost" type="button">Скинути слоти</button>
+        </div>
+      </aside>
+
+      <main class="panel panel-out" id="output">
+        <div class="empty" id="empty-state">
+          <strong>Готовий до брифу</strong>
+          Обери платформу, кількість постів і натисни «Згенерувати стратегію».
+          Отримаєш пропорції, формати й тижневий/місячний розклад.
+        </div>
+      </main>
+    </div>
+
+    <p class="footer-note">PROF1Group · внутрішній інструмент СММ · працює офлайн у браузері</p>
+  </div>
+
+  <script src="strategy-engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
